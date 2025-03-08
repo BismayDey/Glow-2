@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth.token.email == 'bismaydey001@gmail.com';
+    }
+    
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && isOwner(userId);
+      allow delete: if isAuthenticated() && isOwner(userId);
+      
+      // Orders subcollection
+      match /orders/{orderId} {
+        allow read: if isAuthenticated() && isOwner(userId);
+        allow create: if isAuthenticated() && isOwner(userId);
+        allow update: if isAuthenticated() && isOwner(userId);
+        allow delete: if false; // Prevent order deletion
+      }
+    }
+    
+    // Products collection
+    match /products/{productId} {
+      allow read: if true; // Anyone can read products
+      allow write: if isAuthenticated() && isAdmin(); // Only admin can write
+    }
+    
+    // Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if true; // Anyone can read reviews
+      allow create: if isAuthenticated() && 
+        !exists(/databases/$(database)/documents/reviews/$(reviewId)) && // Prevent duplicate reviews
+        request.resource.data.userId == request.auth.uid; // User can only create reviews with their own ID
+      allow update: if isAuthenticated() && 
+        get(/databases/$(database)/documents/reviews/$(reviewId)).data.userId == request.auth.uid; // Only review owner can update
+      allow delete: if isAuthenticated() && 
+        get(/databases/$(database)/documents/reviews/$(reviewId)).data.userId == request.auth.uid; // Only review owner can delete
+    }
+    
+    // Admin collection (if needed)
+    match /admin/{document=**} {
+      allow read, write: if isAuthenticated() && isAdmin();
+    }
+  }
+}
