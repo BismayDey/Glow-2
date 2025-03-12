@@ -1,10 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, X, CreditCard, Package, Truck, Calendar, CreditCard as CardIcon } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  CheckCircle,
+  X,
+  CreditCard,
+  Package,
+  Truck,
+  Calendar,
+  CreditCard as CardIcon,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import toast from "react-hot-toast";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -13,52 +21,84 @@ interface PaymentModalProps {
 }
 
 const paymentMethods = [
-  { id: 'card', name: 'Credit/Debit Card', icon: CreditCard },
-  { id: 'emi', name: 'EMI', icon: Calendar },
-  { id: 'cod', name: 'Cash on Delivery', icon: Package }
+  { id: "card", name: "Credit/Debit Card", icon: CreditCard },
+  { id: "emi", name: "EMI", icon: Calendar },
+  { id: "cod", name: "Cash on Delivery", icon: Package },
 ];
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) => {
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'success' | 'error'>('pending');
+// Define EMI options
+const emiOptions = [
+  { months: 3, interest: 0 },
+  { months: 6, interest: 5 },
+  { months: 9, interest: 8 },
+  { months: 12, interest: 10 },
+];
+
+const PaymentModal: React.FC<PaymentModalProps> = ({
+  isOpen,
+  onClose,
+  total,
+}) => {
+  const [paymentStatus, setPaymentStatus] = useState<
+    "pending" | "processing" | "success" | "error"
+  >("pending");
   const [currentStep, setCurrentStep] = useState(0);
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [orderId, setOrderId] = useState('');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardName, setCardName] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [orderId, setOrderId] = useState("");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("card");
+  const [selectedEmiPeriod, setSelectedEmiPeriod] = useState(3);
+  const [deliveryAddress, setDeliveryAddress] = useState("");
   const { user } = useAuth();
 
   const steps = [
-    { icon: CreditCard, text: 'Processing Payment' },
-    { icon: Package, text: 'Preparing Order' },
-    { icon: Truck, text: 'Ready for Shipping' }
+    { icon: CreditCard, text: "Processing Payment" },
+    { icon: Package, text: "Preparing Order" },
+    { icon: Truck, text: "Ready for Shipping" },
   ];
 
   useEffect(() => {
     if (isOpen) {
-      setPaymentStatus('pending');
+      setPaymentStatus("pending");
       setCurrentStep(0);
-      // Generate a unique order ID with timestamp and random string to avoid duplicates
       const timestamp = Date.now();
       const randomStr = Math.random().toString(36).substring(2, 8);
       setOrderId(`ORD-${timestamp}-${randomStr}`);
+
+      // Load user's address if available
+      if (user) {
+        const fetchUserAddress = async () => {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists() && userDoc.data().address) {
+            setDeliveryAddress(userDoc.data().address);
+          }
+        };
+        fetchUserAddress();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!cardNumber || !cardName || !expiryDate || !cvv) {
-      toast.error('Please fill in all payment details');
-      return;
+
+    if (selectedPaymentMethod === "cod") {
+      if (!deliveryAddress) {
+        toast.error("Please provide delivery address");
+        return;
+      }
+    } else if (selectedPaymentMethod === "card") {
+      if (!cardNumber || !cardName || !expiryDate || !cvv) {
+        toast.error("Please fill in all payment details");
+        return;
+      }
     }
 
-    setPaymentStatus('processing');
-    
-    // Simulate payment processing
+    setPaymentStatus("processing");
+
     const stepTimer = setInterval(() => {
-      setCurrentStep(prev => {
+      setCurrentStep((prev) => {
         if (prev >= steps.length - 1) {
           clearInterval(stepTimer);
           handlePaymentSuccess();
@@ -70,38 +110,39 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
   };
 
   const handlePaymentSuccess = async () => {
-    setPaymentStatus('success');
-    
-    // Save order to user's profile if logged in
+    setPaymentStatus("success");
+
     if (user) {
       try {
-        const userRef = doc(db, 'users', user.uid);
+        const userRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userRef);
-        
+
         if (userDoc.exists()) {
           const orderData = {
             id: orderId,
             date: new Date().toISOString(),
             total: total,
-            status: 'Processing'
+            status: "Processing",
+            paymentMethod: selectedPaymentMethod,
+            deliveryAddress,
           };
-          
+
           await updateDoc(userRef, {
-            orders: arrayUnion(orderData)
+            orders: arrayUnion(orderData),
           });
-          
-          toast.success('Order saved to your profile');
+
+          toast.success("Order saved to your profile");
         }
       } catch (error) {
-        console.error('Error saving order:', error);
+        console.error("Error saving order:", error);
       }
     }
   };
 
   const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
     const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
+    const match = (matches && matches[0]) || "";
     const parts = [];
 
     for (let i = 0, len = match.length; i < len; i += 4) {
@@ -109,20 +150,37 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
     }
 
     if (parts.length) {
-      return parts.join(' ');
+      return parts.join(" ");
     } else {
       return value;
     }
   };
 
   const formatExpiryDate = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    
+    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
+
     if (v.length >= 2) {
       return `${v.substring(0, 2)}/${v.substring(2, 4)}`;
     }
-    
+
     return v;
+  };
+
+  const calculateEmi = (
+    price: number,
+    months: number,
+    interestRate: number
+  ) => {
+    const principal = price;
+    const interest = (principal * interestRate) / 100;
+    const totalAmount = principal + interest;
+    const monthlyPayment = totalAmount / months;
+
+    return {
+      monthlyPayment: monthlyPayment.toFixed(2),
+      totalAmount: totalAmount.toFixed(2),
+      totalInterest: interest.toFixed(2),
+    };
   };
 
   return (
@@ -134,7 +192,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black bg-opacity-50 z-50"
-            onClick={() => paymentStatus === 'success' && onClose(orderId)}
+            onClick={() => paymentStatus === "success" && onClose(orderId)}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
             <motion.div
@@ -145,7 +203,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative p-6">
-                {paymentStatus === 'success' && (
+                {paymentStatus === "success" && (
                   <button
                     onClick={() => onClose(orderId)}
                     className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
@@ -155,7 +213,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                 )}
 
                 <div className="text-center">
-                  {paymentStatus === 'pending' ? (
+                  {paymentStatus === "pending" ? (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -164,10 +222,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                       <h3 className="text-2xl font-bold text-gray-900 mb-6">
                         Payment Details
                       </h3>
-                      
-                      <form onSubmit={handleSubmitPayment} className="space-y-4">
+
+                      <form
+                        onSubmit={handleSubmitPayment}
+                        className="space-y-4"
+                      >
                         <div className="mb-6">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Payment Method
+                          </label>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             {paymentMethods.map((method) => {
                               const Icon = method.icon;
@@ -175,11 +238,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                                 <button
                                   key={method.id}
                                   type="button"
-                                  onClick={() => setSelectedPaymentMethod(method.id)}
+                                  onClick={() =>
+                                    setSelectedPaymentMethod(method.id)
+                                  }
                                   className={`flex items-center justify-center p-3 rounded-lg border ${
                                     selectedPaymentMethod === method.id
-                                      ? 'border-rose-500 bg-rose-50 text-rose-700'
-                                      : 'border-gray-300 hover:bg-gray-50'
+                                      ? "border-rose-500 bg-rose-50 text-rose-700"
+                                      : "border-gray-300 hover:bg-gray-50"
                                   }`}
                                 >
                                   <Icon className="h-5 w-5 mr-2" />
@@ -190,24 +255,32 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                           </div>
                         </div>
 
-                        {selectedPaymentMethod === 'emi' && (
+                        {selectedPaymentMethod === "emi" && (
                           <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">EMI Options</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              EMI Options
+                            </label>
                             <div className="grid grid-cols-2 gap-3">
                               {emiOptions.map((option) => (
                                 <button
                                   key={option.months}
                                   type="button"
-                                  onClick={() => setSelectedEmiPeriod(option.months)}
+                                  onClick={() =>
+                                    setSelectedEmiPeriod(option.months)
+                                  }
                                   className={`p-3 text-center rounded-lg border ${
                                     selectedEmiPeriod === option.months
-                                      ? 'border-rose-500 bg-rose-50 text-rose-700'
-                                      : 'border-gray-300 hover:bg-gray-50'
+                                      ? "border-rose-500 bg-rose-50 text-rose-700"
+                                      : "border-gray-300 hover:bg-gray-50"
                                   }`}
                                 >
-                                  <div className="font-medium">{option.months} Months</div>
+                                  <div className="font-medium">
+                                    {option.months} Months
+                                  </div>
                                   <div className="text-sm text-gray-500">
-                                    {option.interest === 0 ? 'No Interest' : `${option.interest}% Interest`}
+                                    {option.interest === 0
+                                      ? "No Interest"
+                                      : `${option.interest}% Interest`}
                                   </div>
                                 </button>
                               ))}
@@ -215,80 +288,108 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                           </div>
                         )}
 
-                        {selectedPaymentMethod === 'cod' && (
-                          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                            <p className="text-sm text-gray-600">
-                              Pay when your order is delivered. Additional charges may apply.
-                            </p>
+                        {selectedPaymentMethod === "cod" && (
+                          <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Delivery Address
+                            </label>
+                            <textarea
+                              value={deliveryAddress}
+                              onChange={(e) =>
+                                setDeliveryAddress(e.target.value)
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
+                              rows={3}
+                              placeholder="Enter your delivery address"
+                              required
+                            />
                           </div>
                         )}
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 text-left mb-1">
-                            Card Number
-                          </label>
-                          <div className="relative">
-                            <CardIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                            <input
-                              type="text"
-                              value={cardNumber}
-                              onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                              className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
-                              placeholder="1234 5678 9012 3456"
-                              maxLength={19}
-                              required
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 text-left mb-1">
-                            Cardholder Name
-                          </label>
-                          <input
-                            type="text"
-                            value={cardName}
-                            onChange={(e) => setCardName(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
-                            placeholder="John Doe"
-                            required
-                          />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 text-left mb-1">
-                              Expiry Date
-                            </label>
-                            <div className="relative">
-                              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        {selectedPaymentMethod === "card" && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 text-left mb-1">
+                                Card Number
+                              </label>
+                              <div className="relative">
+                                <CardIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <input
+                                  type="text"
+                                  value={cardNumber}
+                                  onChange={(e) =>
+                                    setCardNumber(
+                                      formatCardNumber(e.target.value)
+                                    )
+                                  }
+                                  className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
+                                  placeholder="1234 5678 9012 3456"
+                                  maxLength={19}
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 text-left mb-1">
+                                Cardholder Name
+                              </label>
                               <input
                                 type="text"
-                                value={expiryDate}
-                                onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
-                                className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
-                                placeholder="MM/YY"
-                                maxLength={5}
+                                value={cardName}
+                                onChange={(e) => setCardName(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
+                                placeholder="John Doe"
                                 required
                               />
                             </div>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 text-left mb-1">
-                              CVV
-                            </label>
-                            <input
-                              type="text"
-                              value={cvv}
-                              onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').substring(0, 3))}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
-                              placeholder="123"
-                              maxLength={3}
-                              required
-                            />
-                          </div>
-                        </div>
-                        
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 text-left mb-1">
+                                  Expiry Date
+                                </label>
+                                <div className="relative">
+                                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                  <input
+                                    type="text"
+                                    value={expiryDate}
+                                    onChange={(e) =>
+                                      setExpiryDate(
+                                        formatExpiryDate(e.target.value)
+                                      )
+                                    }
+                                    className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
+                                    placeholder="MM/YY"
+                                    maxLength={5}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 text-left mb-1">
+                                  CVV
+                                </label>
+                                <input
+                                  type="text"
+                                  value={cvv}
+                                  onChange={(e) =>
+                                    setCvv(
+                                      e.target.value
+                                        .replace(/\D/g, "")
+                                        .substring(0, 3)
+                                    )
+                                  }
+                                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-rose-500 focus:border-rose-500"
+                                  placeholder="123"
+                                  maxLength={3}
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+
                         <div className="border-t border-gray-200 pt-4 mt-4">
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-600">Subtotal</span>
@@ -298,23 +399,55 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                             <span className="text-gray-600">Shipping</span>
                             <span>Free</span>
                           </div>
+                          {selectedPaymentMethod === "emi" && (
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-600">
+                                EMI (per month)
+                              </span>
+                              <span>
+                                ₹
+                                {
+                                  calculateEmi(
+                                    total,
+                                    selectedEmiPeriod,
+                                    emiOptions.find(
+                                      (o) => o.months === selectedEmiPeriod
+                                    )?.interest || 0
+                                  ).monthlyPayment
+                                }
+                              </span>
+                            </div>
+                          )}
                           <div className="flex justify-between font-semibold text-lg">
                             <span>Total</span>
-                            <span>₹{total.toFixed(2)}</span>
+                            <span>
+                              ₹
+                              {selectedPaymentMethod === "emi"
+                                ? calculateEmi(
+                                    total,
+                                    selectedEmiPeriod,
+                                    emiOptions.find(
+                                      (o) => o.months === selectedEmiPeriod
+                                    )?.interest || 0
+                                  ).totalAmount
+                                : total.toFixed(2)}
+                            </span>
                           </div>
                         </div>
-                        
+
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           type="submit"
                           className="w-full bg-rose-500 text-white py-3 rounded-lg font-medium hover:bg-rose-600 transition mt-4"
                         >
-                          Pay Now
+                          {selectedPaymentMethod === "cod"
+                            ? "Place Order"
+                            : "Pay Now"}
                         </motion.button>
                       </form>
                     </motion.div>
-                  ) : paymentStatus === 'processing' ? (
+                  ) : paymentStatus === "processing" ? (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -327,21 +460,35 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                             <motion.div
                               key={index}
                               className={`flex flex-col items-center ${
-                                index <= currentStep ? 'text-rose-500' : 'text-gray-300'
+                                index <= currentStep
+                                  ? "text-rose-500"
+                                  : "text-gray-300"
                               }`}
-                              animate={index === currentStep ? {
-                                scale: [1, 1.2, 1],
-                                transition: { repeat: Infinity, duration: 1 }
-                              } : {}}
+                              animate={
+                                index === currentStep
+                                  ? {
+                                      scale: [1, 1.2, 1],
+                                      transition: {
+                                        repeat: Infinity,
+                                        duration: 1,
+                                      },
+                                    }
+                                  : {}
+                              }
                             >
                               <Icon className="h-8 w-8 mb-2" />
                               <motion.div
                                 className="h-1 w-8 rounded-full"
                                 style={{
-                                  backgroundColor: index <= currentStep ? '#f43f5e' : '#e5e7eb'
+                                  backgroundColor:
+                                    index <= currentStep
+                                      ? "#f43f5e"
+                                      : "#e5e7eb",
                                 }}
                                 initial={{ scaleX: 0 }}
-                                animate={index <= currentStep ? { scaleX: 1 } : {}}
+                                animate={
+                                  index <= currentStep ? { scaleX: 1 } : {}
+                                }
                                 transition={{ duration: 0.5 }}
                               />
                             </motion.div>
@@ -354,9 +501,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                       <p className="mt-2 text-gray-600">
                         Total amount: ₹{total.toFixed(2)}
                       </p>
-                      <p className="mt-2 text-gray-600">
-                        Order ID: {orderId}
-                      </p>
+                      <p className="mt-2 text-gray-600">Order ID: {orderId}</p>
                     </motion.div>
                   ) : (
                     <motion.div
@@ -368,16 +513,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{
-                          type: 'spring',
+                          type: "spring",
                           stiffness: 200,
                           damping: 15,
-                          duration: 0.6
+                          duration: 0.6,
                         }}
                       >
                         <motion.div
                           animate={{
                             scale: [1, 1.2, 1],
-                            rotate: [0, 360]
+                            rotate: [0, 360],
                           }}
                           transition={{
                             duration: 1,
@@ -396,12 +541,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, total }) =
                           Order Confirmed!
                         </h3>
                         <p className="mt-2 text-gray-600">
-                          Thank you for your purchase. Your order will be delivered soon.
+                          Thank you for your purchase. Your order will be
+                          delivered soon.
                         </p>
                         <div className="mt-4 bg-gray-50 p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Order ID: <span className="font-medium">{orderId}</span></p>
-                          <p className="text-sm text-gray-600 mt-1">Amount: <span className="font-medium">₹{total.toFixed(2)}</span></p>
-                          <p className="text-sm text-gray-600 mt-1">Date: <span className="font-medium">{new Date().toLocaleDateString()}</span></p>
+                          <p className="text-sm text-gray-600">
+                            Order ID:{" "}
+                            <span className="font-medium">{orderId}</span>
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Amount:{" "}
+                            <span className="font-medium">
+                              ₹{total.toFixed(2)}
+                            </span>
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Date:{" "}
+                            <span className="font-medium">
+                              {new Date().toLocaleDateString()}
+                            </span>
+                          </p>
                         </div>
                         <motion.button
                           onClick={() => onClose(orderId)}
