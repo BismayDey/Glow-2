@@ -2,14 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Responsive adjustments */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #d8a7b1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: #f4e1e6;
+}
+
+* {
+  scrollbar-color: #d8a7b1 #f4e1e6;
+  scrollbar-width: thin;
+}
+
 @media (max-width: 640px) {
   html {
     font-size: 14px;
   }
 }
 
-/* Swiper styles */
 .swiper-button-next,
 .swiper-button-prev {
   color: #f43f5e !important;
@@ -29,4 +45,87 @@
 
 .swiper-pagination-bullet-active {
   background: #f43f5e !important;
+}
+@media screen and (max-width: 1228px) {
+  .best,
+  .cat {
+    transform: scale(0.9);
+  }
+}
+@media screen and (max-width: 1105px) {
+  .best,
+  .cat {
+    transform: scale(0.8);
+  }
+}
+@media screen and (max-width: 986px) {
+  .best,
+  .cat {
+    transform: scale(0.7);
+  }
+  .best {
+    margin-top: -30px;
+    min-height: 400px;
+  }
+  .cat {
+    margin: 0;
+  }
+}
+@media screen and (max-width: 886px) {
+  .best,
+  .cat {
+    transform: scale(0.6);
+  }
+}
+@media screen and (max-width: 743px) {
+  .best,
+  .cat {
+    transform: scale(0.5);
+  }
+  .best {
+    margin-top: -50px;
+    min-height: 300px;
+  }
+  .cat {
+    margin: -70px;
+  }
+}
+@media screen and (max-width: 679px) {
+  .best,
+  .cat {
+    transform: scale(0.4);
+  }
+  .best {
+    margin-top: -70px;
+    min-height: 250px;
+  }
+  .cat {
+    margin: -100px;
+  }
+}
+@media screen and (max-width: 561px) {
+  .best,
+  .cat {
+    transform: scale(0.3);
+  }
+  .best {
+    margin-top: -70px;
+    min-height: 160px;
+  }
+  .cat {
+    margin: -130px;
+  }
+}
+@media screen and (max-width: 380px) {
+  .best,
+  .cat {
+    transform: scale(0.2);
+  }
+  .best {
+    margin-top: -60px;
+    min-height: 80px;
+  }
+  .cat {
+    margin: -160px;
+  }
 }
