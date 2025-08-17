@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Heart, ShoppingCart, Star, Clock } from 'lucide-react';
-import { useCart } from '../context/CartContext';
-import { useNavigate } from 'react-router-dom';
-import { Product } from '../types';
-import toast from 'react-hot-toast';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Heart, ShoppingCart, Star, Clock } from "lucide-react";
+import { useCart } from "../context/CartContext";
+import { useWishlist } from "../context/WishlistContext";
+import { useNavigate } from "react-router-dom";
+import { Product } from "../types";
+import toast from "react-hot-toast";
 
 interface ProductCardProps {
   product: Product;
@@ -12,22 +13,25 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { dispatch } = useCart();
+  const { dispatch: wishlistDispatch, isInWishlist } = useWishlist();
   const navigate = useNavigate();
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const isWishlisted = isInWishlist(product.id);
 
   const addToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    dispatch({ type: 'ADD_TO_CART', payload: product });
+    dispatch({ type: "ADD_TO_CART", payload: product });
     toast.success(`${product.name} added to cart!`);
   };
 
   const toggleWishlist = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
-    toast.success(isWishlisted 
-      ? `${product.name} removed from wishlist` 
-      : `${product.name} added to wishlist`
-    );
+    if (isWishlisted) {
+      wishlistDispatch({ type: "REMOVE_FROM_WISHLIST", payload: product.id });
+      toast.success(`${product.name} removed from wishlist`);
+    } else {
+      wishlistDispatch({ type: "ADD_TO_WISHLIST", payload: product });
+      toast.success(`${product.name} added to wishlist`);
+    }
   };
 
   const navigateToProduct = () => {
@@ -51,12 +55,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           transition={{ duration: 0.3 }}
         />
         <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button 
+          <button
             onClick={toggleWishlist}
             className="bg-white p-2 rounded-full shadow-md hover:bg-rose-50 transition"
           >
-            <Heart 
-              className={`h-5 w-5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : 'text-rose-500'}`} 
+            <Heart
+              className={`h-5 w-5 ${
+                isWishlisted ? "fill-rose-500 text-rose-500" : "text-rose-500"
+              }`}
             />
           </button>
         </div>
@@ -81,8 +87,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             <span className="text-sm text-gray-600 ml-1">{product.rating}</span>
           </div>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mt-2 line-clamp-1">{product.name}</h3>
-        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{product.description}</p>
+        <h3 className="text-lg font-semibold text-gray-900 mt-2 line-clamp-1">
+          {product.name}
+        </h3>
+        <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+          {product.description}
+        </p>
         {product.stock < 10 && (
           <div className="flex items-center text-orange-500 text-sm mt-2">
             <Clock className="h-4 w-4 mr-1" />
