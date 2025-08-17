@@ -17,7 +17,8 @@ const Categories: React.FC<CategoriesProps> = ({ onCategoryClick }) => {
     {
       id: 2,
       name: "Skincare",
-      image: "https://i.postimg.cc/63QHgddS/images-2.jpg",
+      image:
+        "https://jayatri.my.canva.site/glow/_assets/media/fa803343ed79e066c2dbfbc3bde30aab.jpg",
       category: "Skincare",
     },
     {
