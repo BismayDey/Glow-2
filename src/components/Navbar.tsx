@@ -12,7 +12,7 @@ import {
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useWishlist } from "../context/WishlistContext";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Cart from "./Cart";
 import AuthModal from "./auth/AuthModal";
 import UserProfile from "./UserProfile";
@@ -35,6 +35,7 @@ const Navbar: React.FC<NavbarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
   const { state: wishlistState } = useWishlist();
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const cartItemCount = state.items.reduce(
     (total, item) => total + item.quantity,
